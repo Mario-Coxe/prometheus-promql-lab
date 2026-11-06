@@ -1,0 +1,23 @@
+# 1. O Prometheus consegue recolher métricas da API? 1 = sim; 0 = falhou
+up{job="api"}
+
+# 2. Contadores de requisições por rota e estado HTTP
+demo_http_requests_total
+
+# 3. Taxa média de requisições por segundo no último minuto
+sum(rate(demo_http_requests_total[1m]))
+
+# 4. Taxa de erros HTTP 500 por segundo
+sum(rate(demo_http_requests_total{status="500"}[1m]))
+
+# 5. Percentagem de erros HTTP 500 no último minuto
+100 * sum(rate(demo_http_requests_total{status="500"}[1m])) / sum(rate(demo_http_requests_total[1m]))
+
+# 6. Latência p95 da rota lenta, em segundos (histograma clássico)
+histogram_quantile(0.95, sum by (le) (rate(demo_http_request_duration_seconds_bucket{route="/slow"}[1m])))
+
+# 7. Consumo de memória residente do processo Node.js em MiB
+process_resident_memory_bytes / 1024 / 1024
+
+# 8. Quantas requisições tiveram status 500 nos últimos 5 min (estimativa)
+sum(increase(demo_http_requests_total{status="500"}[5m]))

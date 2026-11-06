@@ -1,0 +1,10 @@
+{
+  "name": "prometheus-promql-lab",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "@prometheus-io/client": "0.16.0",
+    "express": "5.1.0"
+  }
+}

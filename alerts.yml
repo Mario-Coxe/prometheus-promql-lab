@@ -1,0 +1,10 @@
+groups:
+  - name: demo-alerts
+    rules:
+      - alert: ApiIndisponivel
+        expr: up{job="api"} == 0
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "A API não está a expor métricas"
