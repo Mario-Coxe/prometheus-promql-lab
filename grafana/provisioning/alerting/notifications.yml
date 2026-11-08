@@ -1,0 +1,26 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: lab-disabled
+    receivers:
+      - uid: lab-disabled-email
+        type: email
+        settings:
+          addresses: lab@example.invalid
+
+policies:
+  - orgId: 1
+    receiver: lab-disabled
+    group_by: [grafana_folder, alertname]
+    routes:
+      - receiver: lab-disabled
+        object_matchers:
+          - [environment, '=', lab]
+        mute_time_intervals: [lab-notifications-disabled]
+
+muteTimes:
+  - orgId: 1
+    name: lab-notifications-disabled
+    time_intervals:
+      - weekdays: ['sunday:saturday']

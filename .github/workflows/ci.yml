@@ -1,0 +1,49 @@
+name: Lab checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate scripts and dashboard
+        run: |
+          sh -n lab.sh
+          sh -n traffic.sh
+          python3 -c "import ast; from pathlib import Path; ast.parse(Path('verify.py').read_text())"
+          python3 -m json.tool grafana/dashboards/application-support.json > /dev/null
+      - name: Start lab
+        run: |
+          ./lab.sh init
+          docker compose config --quiet
+          docker compose up --build -d
+      - name: Wait for Grafana
+        run: |
+          for attempt in $(seq 1 90); do
+            if curl --max-time 3 --fail --silent http://127.0.0.1:3001/api/health > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps -a
+          exit 1
+      - name: Check integration
+        run: |
+          docker compose exec -T api node --check server.js
+          docker compose exec -T prometheus promtool check config /etc/prometheus/prometheus.yml
+          docker compose exec -T prometheus promtool check rules /etc/prometheus/alerts.yml
+          python3 verify.py
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --tail=100
+      - name: Stop lab
+        if: always()
+        run: docker compose down
