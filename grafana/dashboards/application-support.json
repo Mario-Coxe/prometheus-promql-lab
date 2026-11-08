@@ -10,11 +10,11 @@
   ],
   "timezone": "browser",
   "schemaVersion": 41,
-  "version": 1,
+  "version": 2,
   "editable": false,
-  "refresh": "5s",
+  "refresh": "",
   "time": {
-    "from": "now-15m",
+    "from": "now-7d",
     "to": "now"
   },
   "timepicker": {
@@ -138,7 +138,7 @@
       "id": 2,
       "title": "Requests Per Second",
       "type": "stat",
-      "description": "Média por segundo no último minuto. Sem tráfego: 0; sem scrape UP: NO DATA.",
+      "description": "Média de pedidos por segundo calculada sobre as amostras disponíveis no período selecionado.",
       "gridPos": {
         "x": 4,
         "y": 0,
@@ -152,7 +152,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(sum(rate(demo_http_requests_total{job=\"api\"}[1m])) or vector(0)) and on() (min(up{job=\"api\"}) == 1)",
+          "expr": "sum(rate(demo_http_requests_total{job=\"api\"}[$__range])) or vector(0)",
           "legendFormat": "Pedidos/s",
           "instant": true,
           "range": false,
@@ -200,7 +200,7 @@
       "id": 3,
       "title": "HTTP 500 Error Rate",
       "type": "stat",
-      "description": "Erros HTTP 500 / todos os pedidos, em 5 minutos. Sem tráfego: 0%. O alerta exige pelo menos 100 pedidos/5m.",
+      "description": "Percentagem estimada de HTTP 500 no período selecionado. O alerta usa separadamente uma janela fixa de 5 minutos.",
       "gridPos": {
         "x": 10,
         "y": 0,
@@ -214,7 +214,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(100 * (sum(rate(demo_http_requests_total{job=\"api\",status=\"500\"}[5m])) or vector(0)) / clamp_min((sum(rate(demo_http_requests_total{job=\"api\"}[5m])) or vector(0)), 1e-9)) and on() (min(up{job=\"api\"}) == 1)",
+          "expr": "100 * (sum(increase(demo_http_requests_total{job=\"api\",status=\"500\"}[$__range])) or vector(0)) / clamp_min((sum(increase(demo_http_requests_total{job=\"api\"}[$__range])) or vector(0)), 1e-9)",
           "legendFormat": "HTTP 500 (%)",
           "instant": true,
           "range": false,
@@ -270,7 +270,7 @@
       "id": 4,
       "title": "Errors by Endpoint",
       "type": "table",
-      "description": "Quantidade estimada de HTTP 500 por rota nos últimos 5 minutos; increase pode devolver valores fracionários.",
+      "description": "Quantidade estimada de HTTP 500 por rota no período selecionado; increase pode devolver valores fracionários.",
       "gridPos": {
         "x": 0,
         "y": 5,
@@ -284,7 +284,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (route) (increase(demo_http_requests_total{job=\"api\",status=\"500\"}[5m])) or (0 * sum by (route) (increase(demo_http_requests_total{job=\"api\"}[5m])))",
+          "expr": "sum by (route) (increase(demo_http_requests_total{job=\"api\",status=\"500\"}[$__range])) or (0 * sum by (route) (increase(demo_http_requests_total{job=\"api\"}[$__range])))",
           "legendFormat": "",
           "instant": true,
           "range": false,
@@ -322,7 +322,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "HTTP 500 (5m)"
+              "options": "HTTP 500 (período)"
             },
             "properties": [
               {
@@ -348,7 +348,7 @@
             },
             "renameByName": {
               "route": "Endpoint",
-              "Value": "HTTP 500 (5m)"
+              "Value": "HTTP 500 (período)"
             }
           }
         }
@@ -358,7 +358,7 @@
         "cellHeight": "sm",
         "sortBy": [
           {
-            "displayName": "HTTP 500 (5m)",
+            "displayName": "HTTP 500 (período)",
             "desc": true
           }
         ]
@@ -368,7 +368,7 @@
       "id": 5,
       "title": "P95 Latency by Endpoint",
       "type": "timeseries",
-      "description": "P95 estimado por rota em 5 minutos. Os buckets existentes tornam a estimativa aproximada; sem pedidos não há P95.",
+      "description": "Evolução do P95 estimado por rota. A janela de cada ponto adapta-se à escala do gráfico; não é o P95 único de todo o período.",
       "gridPos": {
         "x": 10,
         "y": 5,
@@ -382,7 +382,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(demo_http_request_duration_seconds_bucket{job=\"api\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(demo_http_request_duration_seconds_bucket{job=\"api\"}[$__rate_interval])))",
           "legendFormat": "{{route}}",
           "instant": false,
           "range": true,
@@ -508,7 +508,7 @@
       "id": 7,
       "title": "Top 5 Endpoints",
       "type": "bargauge",
-      "description": "Até cinco rotas com mais pedidos estimados nos últimos 5 minutos.",
+      "description": "Até cinco rotas com mais pedidos estimados no período selecionado.",
       "gridPos": {
         "x": 0,
         "y": 14,
@@ -522,7 +522,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "topk(5, sum by (route) (increase(demo_http_requests_total{job=\"api\"}[5m])))",
+          "expr": "topk(5, sum by (route) (increase(demo_http_requests_total{job=\"api\"}[$__range])))",
           "legendFormat": "{{route}}",
           "instant": true,
           "range": false,

@@ -78,7 +78,8 @@ def main():
     assert len(dashboard['panels']) == 7, 'Faltam painéis no dashboard.'
     for panel in dashboard['panels']:
         for target in panel.get('targets', []):
-            query(target['expr'])
+            expression = target['expr'].replace('$__range', '15m').replace('$__rate_interval', '1m')
+            query(expression)
     print('OK: Grafana, ligação ao Prometheus e sete painéis provisionados; PromQL aceite pelo servidor.')
 
     rules = get_json(grafana + '/api/v1/provisioning/alert-rules')

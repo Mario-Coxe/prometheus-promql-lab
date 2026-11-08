@@ -58,7 +58,7 @@ Os serviços ficam acessíveis apenas na máquina local. Os scripts usam `127.0.
 
 ## Explorar o dashboard
 
-Abre **Dashboards → Application Support → Application Support — Monitoring Lab**. O intervalo inicial é de **15 minutos**, com atualização automática a cada **5 segundos**.
+Abre **Dashboards → Application Support → Application Support — Monitoring Lab**. O intervalo inicial é de **7 dias**, com atualização automática desativada. Usa o botão de atualização para consultar os dados mais recentes.
 
 Gera os primeiros dados:
 
@@ -71,17 +71,21 @@ Gera os primeiros dados:
 
 | Painel | Indicador |
 | --- | --- |
-| API Status | Sucesso do scrape: `UP` verde ou `DOWN` vermelho |
-| Requests Per Second | Média de pedidos/s no último minuto |
-| HTTP 500 Error Rate | Percentagem de respostas HTTP 500 nos últimos 5 minutos |
-| Errors by Endpoint | Quantidade estimada de HTTP 500 por rota nos últimos 5 minutos |
-| P95 Latency by Endpoint | P95 estimado por rota em segundos, janela de 5 minutos |
-| Memory Usage | Memória residente do processo Node.js em MiB |
-| Top 5 Endpoints | Até cinco rotas com mais pedidos estimados nos últimos 5 minutos |
+| API Status | Sucesso do scrape no instante final selecionado: `UP` verde ou `DOWN` vermelho |
+| Requests Per Second | Média de pedidos/s sobre as amostras disponíveis no período selecionado |
+| HTTP 500 Error Rate | Percentagem estimada de respostas HTTP 500 no período selecionado |
+| Errors by Endpoint | Quantidade estimada de HTTP 500 por rota no período selecionado |
+| P95 Latency by Endpoint | Evolução do P95 por rota em segundos, com janela adaptada à escala do gráfico |
+| Memory Usage | Memória residente do processo Node.js em MiB no instante final selecionado |
+| Top 5 Endpoints | Até cinco rotas com mais pedidos estimados no período selecionado |
 
 Passa o cursor sobre o gráfico para consultar valores e horários. Usa a legenda para mostrar ou ocultar rotas e o seletor de tempo para explorar outros intervalos.
 
-Sem tráfego, as taxas tendem a zero; rotas ainda não utilizadas não aparecem. O P95 precisa de pedidos na janela. `increase` estima contagens e pode produzir frações. A rota `/slow` demora aproximadamente 1,2 s, mas o P95 pode aproximar-se de 2,5 s devido aos buckets do histograma.
+Para consultar todo o histórico disponível, define uma data inicial em **From** e `now` em **To**, depois aplica o intervalo. Os totais e a percentagem de erros seguem esse período. O gráfico de P95 mostra a evolução ao longo do tempo, não um único percentil de todo o período. Só é possível consultar dados ainda guardados pelo Prometheus.
+
+O intervalo de atualização da página e o período analisado são independentes. Mesmo com a atualização automática desativada, o Prometheus continua a recolher métricas a cada 5 s e os alertas continuam a ser avaliados. Para acompanhar uma simulação em tempo real, podes ativar temporariamente a atualização no seletor junto ao botão de refresh.
+
+As estatísticas continuam a incluir tráfego antigo enquanto ele fizer parte do período selecionado; escolhe um período mais curto para investigar o comportamento recente. Rotas ainda não utilizadas não aparecem. O P95 precisa de pedidos na janela de cada ponto. `increase` estima contagens e pode produzir frações. A rota `/slow` demora aproximadamente 1,2 s, mas o P95 pode aproximar-se de 2,5 s devido aos buckets do histograma.
 
 **`UP` não significa que todas as funcionalidades estejam saudáveis:** a rota `/error` pode devolver 500 enquanto o scrape continua bem-sucedido. `NO DATA` também não equivale a uma aplicação saudável.
 
@@ -95,7 +99,7 @@ Executa um cenário de cada vez, com o dashboard aberto. Os argumentos numérico
 | `./lab.sh normal 90` | Pedidos a `/ok` | Aumento de RPS e tráfego por rota |
 | `./lab.sh slow 30` | Pedidos a `/slow` | Aumento da latência p95 |
 | `./lab.sh errors 120` | Alternar `/ok` e `/error` | Erros por rota e alerta de taxa de erros |
-| `./lab.sh normal 300` | Tráfego sem novos erros | Recuperação à medida que os erros saem da janela de 5 minutos |
+| `./lab.sh normal 300` | Tráfego sem novos erros | Recuperação do alerta à medida que os erros saem da sua janela de 5 minutos |
 | `./lab.sh down` | Parar apenas a API | Estado DOWN e alerta de indisponibilidade |
 | `./lab.sh recover` | Voltar a iniciar a API | Estado UP e resolução do alerta |
 | `./traffic.sh` | Misturar os três tipos de pedido | 25 respostas OK, 25 erros 500 e 5 respostas lentas |
@@ -148,6 +152,8 @@ python3 verify.py
 
 O script verifica as rotas, HTTP 500, latência, métricas, scrape UP, ligação Grafana → Prometheus, sete painéis, consultas PromQL, avaliação dos dois alertas e política silenciada. Gera alguns pedidos, incluindo um erro 500. Os exercícios acima verificam as transições temporais dos alertas.
 
+Na validação das consultas, o script substitui as variáveis de tempo do Grafana por intervalos de teste de 15 min e 1 min. Os alertas mantêm as suas janelas fixas, independentemente do período escolhido no dashboard; por isso a percentagem global do painel pode diferir da taxa recente que dispara um alerta.
+
 As credenciais são lidas de `.env` ou de `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD`. Se alteraste a password na interface, fornece a atual através do ambiente. Os endereços podem ser ajustados com `API_URL`, `PROMETHEUS_URL` e `GRAFANA_URL`.
 
 O workflow [Lab checks](.github/workflows/ci.yml) executa as verificações de sintaxe e integração no GitHub Actions. Consulta o resultado de cada execução no separador **Actions**.
@@ -160,7 +166,7 @@ O workflow [Lab checks](.github/workflows/ci.yml) executa as verificações de s
 | `/health` devolve 404 em `localhost` | Usa `http://127.0.0.1:3000/health`; outro processo pode estar a responder em IPv6 |
 | Painéis sem dados | Confirma o target `api` em `/targets`, gera tráfego e aguarda pelo menos duas recolhas |
 | Alerta de erros não dispara | Confirma o mínimo de 100 pedidos/5 min, a percentagem acima de 5% e o pending de 1 min |
-| Erros continuam depois de terminar o script | As consultas ainda incluem amostras da janela de 5 min |
+| Erros continuam no dashboard depois de terminar o script | O período selecionado ainda inclui esses erros; escolhe um intervalo mais recente |
 | Login falha após alterar `.env` | A BD mantém a password anterior; mudar `.env` não redefine um utilizador existente |
 
 Para recuperar os serviços:
